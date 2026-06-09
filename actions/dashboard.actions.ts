@@ -64,7 +64,7 @@ export async function getDashboardStats() {
 
     // Calculate total inventory value
     const totalInventoryValue = inventoryAgg.reduce(
-      (sum: number, inv) => sum + inv.quantity * Number(inv.currentCost),
+      (sum: number, inv: any) => sum + inv.quantity * Number(inv.currentCost),
       0
     );
 
