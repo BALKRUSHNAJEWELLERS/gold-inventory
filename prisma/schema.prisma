@@ -1,0 +1,328 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  SALES
+  ACCOUNTANT
+}
+
+enum Category {
+  GOLD
+  SILVER
+  DIAMOND
+  PLATINUM
+  GEMSTONE
+}
+
+enum JobStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  DELIVERED
+}
+
+enum RepairStatus {
+  RECEIVED
+  ASSIGNED
+  IN_PROGRESS
+  READY
+  DELIVERED
+}
+
+enum TransactionType {
+  PAYMENT
+  RECEIPT
+  EXPENSE
+  SALES
+  PURCHASE
+}
+
+enum PaymentMode {
+  CASH
+  UPI
+  CARD
+  BANK_TRANSFER
+}
+
+model Branch {
+  id        String   @id @default(cuid())
+  name      String
+  code      String   @unique
+  address   String?
+  phone     String?
+  
+  users        User[]
+  inventory    Inventory[]
+  sales        Sale[]
+  purchases    Purchase[]
+  customers    Customer[]
+  repairs      Repair[]
+  transactions Transaction[]
+  jobWorks     JobWork[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // Argon2 hash
+  name      String
+  role      Role
+  
+  branchId  String
+  branch    Branch   @relation(fields: [branchId], references: [id])
+  
+  salesMade Sale[]   @relation("SalesUser")
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Product {
+  id              String   @id @default(cuid())
+  code            String   @unique
+  barcode         String   @unique
+  name            String
+  category        Category
+  designNumber    String?
+  purity          String
+  grossWeight     Decimal  @db.Decimal(10, 3)
+  netWeight       Decimal  @db.Decimal(10, 3)
+  stoneWeight     Decimal  @db.Decimal(10, 3)
+  makingCharge    Decimal  @db.Decimal(10, 2)
+  wastagePercent  Decimal  @db.Decimal(5, 2)
+  gstPercent      Decimal  @db.Decimal(5, 2)
+  hsnCode         String?
+  purchasePrice   Decimal  @db.Decimal(12, 2)
+  sellingPrice    Decimal  @db.Decimal(12, 2)
+  
+  inventory       Inventory[]
+  saleItems       SaleItem[]
+  purchaseItems   PurchaseItem[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       String?
+  updatedBy       String?
+}
+
+model Inventory {
+  id          String   @id @default(cuid())
+  
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id])
+  
+  branchId    String
+  branch      Branch   @relation(fields: [branchId], references: [id])
+  
+  quantity    Int
+  currentCost Decimal  @db.Decimal(12, 2)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@unique([productId, branchId])
+}
+
+model Customer {
+  id            String   @id @default(cuid())
+  name          String
+  mobile        String   @unique
+  address       String?
+  panNumber     String?
+  gstNumber     String?
+  
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id])
+  
+  sales         Sale[]
+  repairs       Repair[]
+  
+  outstandingBalance Decimal @default(0) @db.Decimal(12, 2)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Supplier {
+  id            String   @id @default(cuid())
+  name          String
+  mobile        String?
+  address       String?
+  gstNumber     String?
+  
+  purchases     Purchase[]
+  
+  outstandingBalance Decimal @default(0) @db.Decimal(12, 2)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Sale {
+  id            String   @id @default(cuid())
+  invoiceNumber String   @unique
+  
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id])
+  
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id])
+  
+  userId        String
+  user          User     @relation("SalesUser", fields: [userId], references: [id])
+  
+  totalAmount   Decimal  @db.Decimal(12, 2)
+  gstAmount     Decimal  @db.Decimal(12, 2)
+  netAmount     Decimal  @db.Decimal(12, 2)
+  
+  paymentMode   PaymentMode
+  paymentStatus String   // PAID, PARTIAL, UNPAID
+  
+  items         SaleItem[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SaleItem {
+  id            String   @id @default(cuid())
+  
+  saleId        String
+  sale          Sale     @relation(fields: [saleId], references: [id])
+  
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  
+  quantity      Int
+  goldRate      Decimal  @db.Decimal(10, 2)
+  netWeight     Decimal  @db.Decimal(10, 3)
+  wastage       Decimal  @db.Decimal(10, 3)
+  makingCharges Decimal  @db.Decimal(10, 2)
+  stoneCharges  Decimal  @db.Decimal(10, 2)
+  gstAmount     Decimal  @db.Decimal(10, 2)
+  totalPrice    Decimal  @db.Decimal(12, 2)
+}
+
+model Purchase {
+  id              String   @id @default(cuid())
+  invoiceNumber   String
+  
+  branchId        String
+  branch          Branch   @relation(fields: [branchId], references: [id])
+  
+  supplierId      String
+  supplier        Supplier @relation(fields: [supplierId], references: [id])
+  
+  totalAmount     Decimal  @db.Decimal(12, 2)
+  
+  items           PurchaseItem[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@unique([supplierId, invoiceNumber])
+}
+
+model PurchaseItem {
+  id            String   @id @default(cuid())
+  
+  purchaseId    String
+  purchase      Purchase @relation(fields: [purchaseId], references: [id])
+  
+  productId     String
+  product       Product  @relation(fields: [productId], references: [id])
+  
+  quantity      Int
+  unitPrice     Decimal  @db.Decimal(12, 2)
+  totalPrice    Decimal  @db.Decimal(12, 2)
+}
+
+model Karigar {
+  id            String   @id @default(cuid())
+  name          String
+  mobile        String
+  address       String?
+  
+  jobWorks      JobWork[]
+  
+  outstandingBalance Decimal @default(0) @db.Decimal(12, 2)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model JobWork {
+  id            String   @id @default(cuid())
+  jobNumber     String   @unique
+  
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id])
+  
+  karigarId     String
+  karigar       Karigar  @relation(fields: [karigarId], references: [id])
+  
+  description   String
+  status        JobStatus @default(ASSIGNED)
+  
+  issueWeight   Decimal  @db.Decimal(10, 3)
+  receiveWeight Decimal? @db.Decimal(10, 3)
+  weightLoss    Decimal? @db.Decimal(10, 3)
+  labourCharges Decimal? @db.Decimal(10, 2)
+  
+  issueDate     DateTime @default(now())
+  receiveDate   DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Repair {
+  id            String   @id @default(cuid())
+  repairNumber  String   @unique
+  
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id])
+  
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id])
+  
+  productDesc   String
+  status        RepairStatus @default(RECEIVED)
+  
+  estimatedCost Decimal? @db.Decimal(10, 2)
+  actualCost    Decimal? @db.Decimal(10, 2)
+  
+  receiveDate   DateTime @default(now())
+  deliveryDate  DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Transaction {
+  id            String   @id @default(cuid())
+  
+  branchId      String
+  branch        Branch   @relation(fields: [branchId], references: [id])
+  
+  type          TransactionType
+  amount        Decimal  @db.Decimal(12, 2)
+  paymentMode   PaymentMode
+  referenceNo   String?
+  description   String?
+  
+  date          DateTime @default(now())
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
